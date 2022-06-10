@@ -101,7 +101,7 @@ class to_html:
         self.next()
         return frontmatter
 
-    def consume_header(self, node):
+    def consume_header(self):
         depth = 0
         for c in self.line():
             match c:
@@ -111,25 +111,25 @@ class to_html:
                     self.error(f'unrecognized character "{c}".')
         if depth > 5:
             self.error('inappropriate header depth.')
-        ET.SubElement(node, f'h{depth}').text = self.line()[depth:].strip()
+        ET.SubElement(self.content, f'h{depth}').text = self.line()[depth:].strip()
         self.next()
 
-    def consume_bullet_list(self, node):
-        bullet_list = ET.SubElement(node, 'ul')
+    def consume_bullet_list(self):
+        bullet_list = ET.SubElement(self.content, 'ul')
         while self.line().startswith('-'):
             ET.SubElement(bullet_list, 'li').text = self.line()[1:].strip()
             self.next()
 
-    def consume_ordered_list(self, node):
-        ordered_list = ET.SubElement(node, 'ol')
+    def consume_ordered_list(self):
+        ordered_list = ET.SubElement(self.content, 'ol')
         i = 1
         while self.line().startswith(f'{i}.'):
             ET.SubElement(ordered_list, 'li').text = self.line()[len(f'{i}.'):].strip()
             i += 1
             self.next()
 
-    def consume_paragraph(self, node):
-        paragraph = ET.SubElement(node, 'p')
+    def consume_paragraph(self):
+        paragraph = ET.SubElement(self.content, 'p')
         paragraph.text = self.next()
         while self.line():
             paragraph.text += ' ' + self.next()
@@ -139,7 +139,7 @@ class to_html:
         except ValueError as e:
             self.error(e)
 
-    def consume_code_block(self, node):
+    def consume_code_block(self):
         lang = self.line()[3:].strip()
         code = ''
         self.next()
@@ -150,11 +150,11 @@ class to_html:
             self.error('unterminated code block.')
 
         if lang:
-            node.append(ET.fromstring(highlight(
+            self.content.append(ET.fromstring(highlight(
                 code, get_lexer_by_name(lang), HtmlFormatter()
             )))
         else:
-            ET.SubElement(ET.SubElement(node, 'pre'), 'code').text = code
+            ET.SubElement(ET.SubElement(self.content, 'pre'), 'code').text = code
         self.next()
 
     def __call__(self, src):
@@ -163,24 +163,25 @@ class to_html:
         self.content = ET.Element('div', {'class': 'body'})
 
         frontmatter = {}
-        first = True
+        self.skip_whitespace()
+        if self.line() == '---':
+            frontmatter = self.consume_frontmatter()
+
+        prefixes = {
+            '#': self.consume_header,
+            '-': self.consume_bullet_list,
+            '1.': self.consume_ordered_list,
+            '```': self.consume_code_block
+        }
         while not self.at_end():
             self.skip_whitespace()
 
-            if first and self.line() == '---':
-                frontmatter = self.consume_frontmatter()
-            elif self.line().startswith('#'):
-                self.consume_header(self.content)
-            elif self.line().startswith('-'):
-                self.consume_bullet_list(self.content)
-            elif self.line().startswith('1.'):
-                self.consume_ordered_list(self.content)
-            elif self.line().startswith('```'):
-                self.consume_code_block(self.content)
+            for prefix, consume in prefixes.items():
+                if self.line().startswith(prefix):
+                    consume()
+                    break
             else:
-                self.consume_paragraph(self.content)
-            self.start = self.current
-            first = False
+                self.consume_paragraph()
 
         return (ET.tostring(self.content, encoding='unicode', method='html'), frontmatter)
 
