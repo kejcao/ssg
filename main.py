@@ -5,7 +5,7 @@ from jinja2 import (
     select_autoescape,
     FileSystemLoader
 )
-from dateutil.parser import isoparse
+from dateutil.parser import parse
 import kcdoc
 
 ROOTDIR = Path('/srv/http/')
@@ -22,31 +22,36 @@ def error(msg):
     print('ssg:', msg, file=sys.stderr)
     sys.exit(1)
 
-def renderj2():
+def renderj2(posts):
     for j2 in Path(ROOTDIR).glob('**/*.j2'):
         if j2 not in IGNORE:
             j2.with_suffix('.html').write_text(
                 j2env.get_template(
                     str(j2.relative_to(ROOTDIR))
-                ).render()
-            )
+                ).render({ 'posts': posts }))
 
 def render_posts():
+    posts = []
     for post in Path(POSTS_DIR).glob('**/*.kcdoc'):
         content, frontmatter = kcdoc.to_html(post.read_text())
+
         if not { 'title', 'desc', 'date' } <= frontmatter.keys():
             error(f'misformed frontmatter in {post}.')
 
-        frontmatter['date'] = isoparse(frontmatter['date']).strftime('%Y-%m-%d')
+        frontmatter['date'] = parse(frontmatter['date']).strftime('%Y-%m-%d')
+        frontmatter['slug'] = post.stem
+
+        posts.append(frontmatter)
         post.with_suffix('.html').write_text(
-            j2env.get_template(POST_TMPL).render(
-                { 'post': { 'content': content, **frontmatter } }
-            )
-        )
+            j2env.get_template(POST_TMPL).render({
+                'post': { 'content': content, **frontmatter }
+            }))
+
+    return posts
 
 def main():
-    renderj2()
-    render_posts()
+    posts = render_posts()
+    renderj2(posts)
 
 if __name__ == '__main__':
     main()
