@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from jinja2 import (
     Environment,
@@ -33,9 +34,9 @@ def renderj2():
 def render_posts():
     for post in Path(POSTS_DIR).glob('**/*.kcdoc'):
         content, frontmatter = kcdoc.to_html(post.read_text())
-        if any(key not in frontmatter for key in ['title', 'desc', 'date']):
-            error(f'essential key {key} not found.')
-            
+        if not { 'title', 'desc', 'date' } <= frontmatter.keys():
+            error(f'misformed frontmatter in {post}.')
+
         frontmatter['date'] = isoparse(frontmatter['date']).strftime('%Y-%m-%d')
         post.with_suffix('.html').write_text(
             j2env.get_template(POST_TMPL).render(
