@@ -5,18 +5,18 @@ from pygments.formatters import HtmlFormatter
 
 class apply_inline():
     def error(self, msg):
-        raise ValueError(f'at ch {self.current}: {msg}')
+        raise ValueError(msg)
 
-    def consume_inline_element(self, ch, tag):
+    def consume_inline_element(self, ch, tag, what):
         elem = ET.Element(tag)
         elem.text = ''
         self.next()
-        while not self.at_end() and self.ch() != ch:
-            elem.text += self.ch()
-            self.next()
 
+        while not self.at_end() and self.ch() != ch:
+            elem.text += self.next()
         if self.at_end():
-            self.error(f'unmatched "{ch}".')
+            self.error(f'unterminated {what}.')
+
         self.next()
         self.push(elem)
 
@@ -24,16 +24,19 @@ class apply_inline():
         link = ET.Element('a', {'href': ''})
         link.text = ''
         self.next()
-        while not self.at_end() and self.ch() != ']':
-            link.text += self.ch()
-            self.next()
 
-        self.next()
-        self.next()
+        while not self.at_end() and self.ch() != ']':
+            link.text += self.next()
+        if self.at_end():
+            self.error('unterminated link text.')
+
+        while self.next() != '(':
+            pass
 
         while not self.at_end() and self.ch() != ')':
-            link.attrib['href'] += self.ch()
-            self.next()
+            link.attrib['href'] += self.next()
+        if self.at_end():
+            self.error('unterminated link href.')
 
         self.next()
         self.push(link)
@@ -41,45 +44,43 @@ class apply_inline():
     def __call__(self, paragraph):
         self.src = paragraph.text
         self.current = 0
+
         self.paragraph = paragraph
         self.paragraph.text = ''
-        self.latest = None
+        self.paragraph.tail = ''
+
+        self.latest_elem = None
 
         while not self.at_end():
             match self.ch():
-                case '*': self.consume_inline_element('*', 'i')
-                case '`': self.consume_inline_element('`', 'code')
+                case '*': self.consume_inline_element('*', 'i', 'italics')
+                case '`': self.consume_inline_element('`', 'code', 'code element')
                 case '[' if self.src.find('](', self.current):
                     self.consume_link()
-                case c:
-                    if self.latest is None:
-                        self.paragraph.text += c
+                case _:
+                    if self.latest_elem is None:
+                        self.paragraph.text += self.next()
                     else:
-                        self.latest.tail += c
-                    self.next()
-
-        return self.paragraph
+                        self.latest_elem.tail += self.next()
 
     def at_end(self):
         return self.current >= len(self.src)
 
-    def ch(self, pos=-1):
-        if pos == -1:
-            if self.at_end():
-                return ''
-            else:
-                return self.src[self.current]
-        else:
-            return self.src[pos]
+    def ch(self):
+        if self.at_end():
+            return ''
+        return self.src[self.current]
+
+    def next(self):
+        if self.at_end():
+            return ''
+        self.current += 1
+        return self.src[self.current-1]
 
     def push(self, elem):
         self.paragraph.append(elem)
-        self.latest = elem
-        self.latest.tail = ''
-
-    def next(self):
-        self.current += 1
-        return self.ch(self.current-1)
+        self.latest_elem = elem
+        self.latest_elem.tail = ''
 
 class to_html:
     def error(self, msg):
