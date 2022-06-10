@@ -38,10 +38,10 @@ class apply_inline():
         self.next()
         self.push(link)
 
-    def __call__(self, src):
-        self.src = src
+    def __call__(self, paragraph):
+        self.src = paragraph.text
         self.current = 0
-        self.paragraph = ET.Element('p')
+        self.paragraph = paragraph
         self.paragraph.text = ''
         self.latest = None
 
@@ -135,8 +135,7 @@ class to_html:
             paragraph.text += ' ' + self.next()
 
         try:
-            paragraph.append(apply_inline(paragraph.text))
-            paragraph.text = ''
+            apply_inline(paragraph)
         except ValueError as e:
             self.error(e)
 
