@@ -41,13 +41,13 @@ class apply_inline():
         self.next()
         self.push(link)
 
-    def __call__(self, paragraph):
-        self.src = paragraph.text
+    def __call__(self, content):
+        self.src = content.text
         self.current = 0
 
-        self.paragraph = paragraph
-        self.paragraph.text = ''
-        self.paragraph.tail = ''
+        self.content = content
+        self.content.text = ''
+        self.content.tail = ''
 
         self.latest_elem = None
 
@@ -59,7 +59,7 @@ class apply_inline():
                     self.consume_link()
                 case _:
                     if self.latest_elem is None:
-                        self.paragraph.text += self.next()
+                        self.content.text += self.next()
                     else:
                         self.latest_elem.tail += self.next()
 
@@ -78,17 +78,13 @@ class apply_inline():
         return self.src[self.current-1]
 
     def push(self, elem):
-        self.paragraph.append(elem)
+        self.content.append(elem)
         self.latest_elem = elem
         self.latest_elem.tail = ''
 
 class to_html:
     def error(self, msg):
         raise ValueError(f'at line {self.current}: {msg}')
-
-    def skip_whitespace(self):
-        while not self.at_end() and not self.line():
-            self.next()
 
     def consume_frontmatter(self):
         frontmatter = {}
@@ -118,27 +114,25 @@ class to_html:
     def consume_bullet_list(self):
         bullet_list = ET.SubElement(self.content, 'ul')
         while self.line().startswith('-'):
-            ET.SubElement(bullet_list, 'li').text = self.line()[1:].strip()
-            self.next()
+            li = ET.SubElement(bullet_list, 'li')
+            li.text = self.next()[1:].strip()
+            self.try_apply_inline(li)
 
     def consume_ordered_list(self):
         ordered_list = ET.SubElement(self.content, 'ol')
         i = 1
         while self.line().startswith(f'{i}.'):
-            ET.SubElement(ordered_list, 'li').text = self.line()[len(f'{i}.'):].strip()
+            li = ET.SubElement(ordered_list, 'li')
+            li.text = self.next()[len(f'{i}.'):].strip()
+            self.try_apply_inline(li)
             i += 1
-            self.next()
 
     def consume_paragraph(self):
         paragraph = ET.SubElement(self.content, 'p')
         paragraph.text = self.next()
         while self.line():
             paragraph.text += ' ' + self.next()
-
-        try:
-            apply_inline(paragraph)
-        except ValueError as e:
-            self.error(e)
+        self.try_apply_inline(paragraph)
 
     def consume_code_block(self):
         lang = self.line()[3:].strip()
@@ -185,6 +179,16 @@ class to_html:
                 self.consume_paragraph()
 
         return (ET.tostring(self.content, encoding='unicode', method='html'), frontmatter)
+
+    def try_apply_inline(self, elem):
+        try:
+            apply_inline(elem)
+        except ValueError as e:
+            self.error(e)
+
+    def skip_whitespace(self):
+        while not self.at_end() and not self.line():
+            self.next()
 
     def at_end(self):
         return self.current >= len(self.src)
