@@ -76,7 +76,7 @@ class apply_inline():
         self.paragraph.append(elem)
         self.latest = elem
         self.latest.tail = ''
-        
+
     def next(self):
         self.current += 1
         return self.ch(self.current-1)
@@ -86,13 +86,13 @@ class to_html:
         raise ValueError(f'at line {self.current}: {msg}')
 
     def skip_whitespace(self):
-        while not self.at_end() and self.is_line_empty():
+        while not self.at_end() and not self.line():
             self.next()
 
     def consume_frontmatter(self):
         frontmatter = {}
         self.next()
-        while not self.line().strip().startswith('---'):
+        while not self.line().startswith('---'):
             mid = self.line().find(':')
             if mid == -1:
                 self.error('no ":" found in frontmatter pair.')
@@ -130,11 +130,10 @@ class to_html:
 
     def consume_paragraph(self, node):
         paragraph = ET.SubElement(node, 'p')
-        paragraph.text = self.line().strip()
-        self.next()
-        while not self.is_line_empty():
-            paragraph.text += ' ' + self.line().strip()
-            self.next()
+        paragraph.text = self.next()
+        while self.line():
+            paragraph.text += ' ' + self.next()
+
         try:
             paragraph.append(apply_inline(paragraph.text))
             paragraph.text = ''
@@ -146,17 +145,14 @@ class to_html:
         code = ''
         self.next()
         while not self.line().startswith('```') and not self.at_end():
-            code += self.line() + '\n'
-            self.next()
+            code += self.next() + '\n'
 
         if self.at_end():
             self.error('unterminated code block.')
 
         if lang:
             node.append(ET.fromstring(highlight(
-                code,
-                get_lexer_by_name(lang),
-                HtmlFormatter()
+                code, get_lexer_by_name(lang), HtmlFormatter()
             )))
         else:
             ET.SubElement(ET.SubElement(node, 'pre'), 'code').text = code
@@ -172,13 +168,13 @@ class to_html:
         while not self.at_end():
             self.skip_whitespace()
 
-            if first and self.line().strip() == '---':
+            if first and self.line() == '---':
                 frontmatter = self.consume_frontmatter()
-            elif self.line().strip().startswith('#'):
+            elif self.line().startswith('#'):
                 self.consume_header(self.content)
-            elif self.line().strip().startswith('-'):
+            elif self.line().startswith('-'):
                 self.consume_bullet_list(self.content)
-            elif self.line().strip().startswith('1.'):
+            elif self.line().startswith('1.'):
                 self.consume_ordered_list(self.content)
             elif self.line().startswith('```'):
                 self.consume_code_block(self.content)
@@ -192,23 +188,19 @@ class to_html:
     def at_end(self):
         return self.current >= len(self.src)
 
-    def line(self, pos=-1):
-        if pos == -1:
-            if self.at_end():
-                return ''
-            else:
-                return self.src[self.current]
-        else:
-            return self.src[pos]
+    def line(self):
+        return self.raw_line().strip()
 
-    def is_line_empty(self):
-        return not self.line().strip()
+    def raw_line(self):
+        if self.at_end():
+            return ''
+        return self.src[self.current]
 
     def next(self):
         if self.at_end():
             return ''
         self.current += 1
-        return self.line(self.current-1)
+        return self.src[self.current-1].strip()
 
 to_html = to_html()
 apply_inline = apply_inline()
