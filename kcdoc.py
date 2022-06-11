@@ -108,7 +108,21 @@ class to_html:
                     self.error(f'unrecognized character "{c}".')
         if depth > 5:
             self.error('inappropriate header depth.')
-        ET.SubElement(self.content, f'h{depth}').text = self.line()[depth:].strip()
+
+        def gen_uid(id_):
+            new_id = id_
+            i = 1
+            while new_id in self.header_ids:
+                new_id = f'{id_}{i}'
+                i += 1
+            self.header_ids.add(new_id)
+            return new_id
+
+        text = self.line()[depth:].strip()
+        ET.SubElement(self.content, f'h{depth}', {
+            'id': gen_uid(text.lower().replace(' ', '-')),
+        }).text = text
+
         self.next()
 
     def consume_bullet_list(self):
@@ -156,6 +170,7 @@ class to_html:
         self.src = src.splitlines()
         self.current = 0
         self.content = ET.Element('div', {'class': 'body'})
+        self.header_ids = set()
 
         frontmatter = {}
         self.skip_whitespace()
