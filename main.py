@@ -39,10 +39,13 @@ def renderj2(posts):
 def render_posts():
     posts = []
     for post in Path(POSTS_DIR).glob('**/*.kcdoc'):
-        content, frontmatter = kcdoc.to_html(post.read_text())
+        try:
+            content, frontmatter = kcdoc.to_html(post.read_text())
+        except ValueError as e:
+            error(f'{post}: {e}')
 
         if not { 'title', 'desc', 'date' } <= frontmatter.keys():
-            error(f'misformed frontmatter in {post}.')
+            error(f'{post}: misformed frontmatter.')
 
         frontmatter['date'] = parse(frontmatter['date']).strftime('%Y-%m-%d')
         frontmatter['slug'] = post.stem
