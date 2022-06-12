@@ -46,6 +46,7 @@ def render_posts():
 
         frontmatter['date'] = parse(frontmatter['date']).strftime('%Y-%m-%d')
         frontmatter['slug'] = post.stem
+        frontmatter['draft'] = 'draft' in frontmatter
 
         posts.append(frontmatter)
 
