@@ -1,8 +1,7 @@
 import sys
 from pathlib import Path
 from jinja2 import (
-    Environment,
-    select_autoescape,
+    Environment, select_autoescape,
     FileSystemLoader
 )
 from dateutil.parser import parse
@@ -22,13 +21,20 @@ def error(msg):
     print('ssg:', msg, file=sys.stderr)
     sys.exit(1)
 
+def render_template(tmpl, data):
+    try:
+        return j2env.get_template(tmpl).render(data)
+    except Exception as e:
+        error(f'{tmpl}: {e}.')
+
 def renderj2(posts):
     for j2 in Path(ROOTDIR).glob('**/*.j2'):
         if j2 not in IGNORE:
             j2.with_suffix('.html').write_text(
-                j2env.get_template(
-                    str(j2.relative_to(ROOTDIR))
-                ).render({ 'posts': posts }))
+                render_template(
+                    str(j2.relative_to(ROOTDIR)),
+                    { 'posts': posts }
+                ))
 
 def render_posts():
     posts = []
@@ -42,10 +48,11 @@ def render_posts():
         frontmatter['slug'] = post.stem
 
         posts.append(frontmatter)
+
         post.with_suffix('.html').write_text(
-            j2env.get_template(POST_TMPL).render({
-                'post': { 'content': content, **frontmatter }
-            }))
+            render_template(POST_TMPL, { 'post': {
+                'content': content, **frontmatter
+            }}))
 
     return posts
 
