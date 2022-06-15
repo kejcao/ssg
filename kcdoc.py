@@ -153,7 +153,8 @@ class to_html:
         code = ''
         self.next()
         while not self.line().startswith('```') and not self.at_end():
-            code += self.next() + '\n'
+            code += self.raw_line() + '\n'
+            self.next()
 
         if self.at_end():
             self.error('unterminated code block.')
