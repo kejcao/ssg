@@ -7,7 +7,7 @@ from jinja2 import (
 from dateutil.parser import parse
 import kcdoc
 
-ROOTDIR = Path('/srv/http/')
+ROOTDIR = Path('/var/www/html/')
 POSTS_DIR = ROOTDIR/'posts'
 POST_TMPL = 'tmpls/post.j2'
 IGNORE = list(Path(ROOTDIR/'tmpls').glob('**/*.j2'))
