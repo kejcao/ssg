@@ -21,6 +21,9 @@ def error(msg):
     print('ssg:', msg, file=sys.stderr)
     sys.exit(1)
 
+def should_update(src, dest):
+    return not dest.exists() or src.stat().st_mtime > dest.stat().st_mtime
+
 def render_template(tmpl, data):
     try:
         return j2env.get_template(tmpl).render(data)
@@ -28,37 +31,41 @@ def render_template(tmpl, data):
         error(f'{tmpl}: {e}.')
 
 def renderj2(posts):
-    for j2 in Path(ROOTDIR).glob('**/*.j2'):
-        if j2 not in IGNORE:
-            j2.with_suffix('.html').write_text(
-                render_template(
-                    str(j2.relative_to(ROOTDIR)),
-                    { 'posts': posts }
-                ))
+    for src in Path(ROOTDIR).glob('**/*.j2'):
+        dest = src.with_suffix('.html')
+        if src not in IGNORE and should_update(src, dest):
+            dest.write_text(render_template(
+                str(src.relative_to(ROOTDIR)),
+                { 'posts': posts }
+            ))
 
 def render_posts():
     posts = []
-    for post in Path(POSTS_DIR).glob('**/*.kcdoc'):
+    for src in Path(POSTS_DIR).glob('**/*.kcdoc'):
+        (folder := src.with_suffix('')).mkdir(exist_ok=True)
+        dest = folder/'index.html'
+
         try:
-            content, frontmatter = kcdoc.to_html(post.read_text())
+            content, frontmatter = kcdoc.to_html(
+                src.read_text(),
+                just_frontmatter=not should_update(src, dest)
+            )
         except ValueError as e:
-            error(f'{post}: {e}')
+            error(f'{src}: {e}')
 
         if not { 'title', 'desc', 'date' } <= frontmatter.keys():
-            error(f'{post}: misformed frontmatter.')
+            error(f'{src}: misformed frontmatter.')
 
         frontmatter['date'] = parse(frontmatter['date']).strftime('%Y-%m-%d')
-        frontmatter['slug'] = post.stem
+        frontmatter['slug'] = src.stem
         frontmatter['draft'] = 'draft' in frontmatter
 
         posts.append(frontmatter)
 
-        folder = post.with_suffix('')
-        folder.mkdir(exist_ok=True)
-        (folder/'index.html').write_text(
-            render_template(POST_TMPL, { 'post': {
-                'content': content, **frontmatter
-            }}))
+        if should_update(src, dest):
+            dest.write_text(render_template(POST_TMPL,
+                { 'post': { 'content': content, **frontmatter } }
+            ))
 
     return posts
 

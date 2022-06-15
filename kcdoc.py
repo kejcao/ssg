@@ -166,7 +166,7 @@ class to_html:
             ET.SubElement(ET.SubElement(self.content, 'pre'), 'code').text = code
         self.next()
 
-    def __call__(self, src):
+    def __call__(self, src, just_frontmatter=False):
         self.src = src.splitlines()
         self.current = 0
         self.content = ET.Element('div', {'class': 'body'})
@@ -177,23 +177,25 @@ class to_html:
         if self.line() == '---':
             frontmatter = self.consume_frontmatter()
 
-        prefixes = {
-            '#': self.consume_header,
-            '-': self.consume_bullet_list,
-            '1.': self.consume_ordered_list,
-            '```': self.consume_code_block
-        }
-        while not self.at_end():
-            self.skip_whitespace()
+        if not just_frontmatter:
+            prefixes = {
+                '#': self.consume_header,
+                '-': self.consume_bullet_list,
+                '1.': self.consume_ordered_list,
+                '```': self.consume_code_block
+            }
+            while not self.at_end():
+                self.skip_whitespace()
 
-            for prefix, consume in prefixes.items():
-                if self.line().startswith(prefix):
-                    consume()
-                    break
-            else:
-                self.consume_paragraph()
+                for prefix, consume in prefixes.items():
+                    if self.line().startswith(prefix):
+                        consume()
+                        break
+                else:
+                    self.consume_paragraph()
 
-        return (ET.tostring(self.content, encoding='unicode', method='html'), frontmatter)
+        html = ET.tostring(self.content, encoding='unicode', method='html')
+        return (html if not just_frontmatter else '', frontmatter)
 
     def try_apply_inline(self, elem):
         try:
