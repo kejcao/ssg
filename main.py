@@ -53,7 +53,9 @@ def render_posts():
 
         posts.append(frontmatter)
 
-        post.with_suffix('.html').write_text(
+        folder = post.with_suffix('')
+        folder.mkdir(exist_ok=True)
+        (folder/'index.html').write_text(
             render_template(POST_TMPL, { 'post': {
                 'content': content, **frontmatter
             }}))
