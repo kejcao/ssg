@@ -4,7 +4,7 @@ from jinja2 import (
     Environment, select_autoescape,
     FileSystemLoader
 )
-from dateutil.parser import parse
+from dateutil.parser import parse, ParserError
 import kcdoc
 
 ROOTDIR = Path('/var/www/html/')
@@ -56,7 +56,11 @@ def render_posts():
         if not { 'title', 'desc', 'date' } <= frontmatter.keys():
             error(f'{src}: misformed frontmatter.')
 
-        frontmatter['date'] = parse(frontmatter['date']).strftime('%Y-%m-%d')
+        try:
+            frontmatter['date'] = parse(frontmatter['date']).strftime('%Y-%m-%d')
+        except ParserError:
+            error(f'{src}: misformed date in frontmatter.')
+
         frontmatter['slug'] = src.stem
         frontmatter['draft'] = 'draft' in frontmatter
 
