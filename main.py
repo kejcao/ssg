@@ -1,4 +1,5 @@
 import sys
+import argparse
 from pathlib import Path
 from jinja2 import (
     Environment, select_autoescape,
@@ -22,7 +23,8 @@ def error(msg):
     sys.exit(1)
 
 def should_update(src, dest):
-    return not dest.exists() or src.stat().st_mtime > dest.stat().st_mtime
+    return (ARGS.all or not dest.exists() or
+            src.stat().st_mtime > dest.stat().st_mtime)
 
 def render_template(tmpl, data):
     try:
@@ -74,6 +76,14 @@ def render_posts():
     return posts
 
 def main():
+    global ARGS
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-a', '--all', action='store_true',
+        help='render everything, regardless of modification time.'
+    )
+    ARGS = parser.parse_args()
+
     posts = render_posts()
     renderj2(posts)
 
