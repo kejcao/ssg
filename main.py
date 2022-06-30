@@ -1,11 +1,12 @@
-import sys
-import argparse
 from pathlib import Path
-from jinja2 import (
-    Environment, select_autoescape,
-    FileSystemLoader
-)
 from dateutil.parser import parse, ParserError
+import sys
+import pygments
+import pygments.lexers
+import pygments.formatters
+import argparse
+import jinja2
+import jinja2.ext
 import kcdoc
 
 ROOTDIR = Path('/var/www/html/')
@@ -13,9 +14,30 @@ POSTS_DIR = ROOTDIR/'posts'
 POST_TMPL = 'tmpls/post.j2'
 IGNORE = list(Path(ROOTDIR/'tmpls').glob('**/*.j2'))
 
-j2env = Environment(
-    loader=FileSystemLoader(ROOTDIR),
-    autoescape=select_autoescape()
+class Jinja2Highlight(jinja2.ext.Extension):
+    tags = set(['highlight'])
+
+    def __init__(self, env):
+        super().__init__(env)
+
+    def parse(self, parser):
+        lineno = next(parser.stream).lineno
+        return jinja2.nodes.CallBlock(
+            self.call_method('_highlight', [parser.parse_expression()]), [], [],
+            parser.parse_statements(['name:endhighlight'], drop_needle=True)
+        ).set_lineno(lineno)
+    
+    def _highlight(self, lang, caller):
+        return pygments.highlight(
+            jinja2.ext.Markup(caller().strip()).unescape(),
+            pygments.lexers.get_lexer_by_name(lang),
+            pygments.formatters.HtmlFormatter()
+        )
+
+j2env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(ROOTDIR),
+    autoescape=jinja2.select_autoescape(),
+    extensions=[Jinja2Highlight]
 )
 
 def error(msg):
@@ -23,8 +45,10 @@ def error(msg):
     sys.exit(1)
 
 def should_update(src, dest):
-    return (ARGS.all or not dest.exists() or
-            src.stat().st_mtime > dest.stat().st_mtime)
+    return (
+        ARGS.all or not dest.exists() or
+        src.stat().st_mtime > dest.stat().st_mtime
+    )
 
 def render_template(tmpl, data):
     try:

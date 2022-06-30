@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
-from pygments import highlight
-from pygments.lexers import get_lexer_by_name
-from pygments.formatters import HtmlFormatter
+import pygments
+import pygments.lexers
+import pygments.formatters
 
 class apply_inline():
     def error(self, msg):
@@ -160,8 +160,9 @@ class to_html:
             self.error('unterminated code block.')
 
         if lang:
-            self.content.append(ET.fromstring(highlight(
-                code, get_lexer_by_name(lang), HtmlFormatter()
+            self.content.append(ET.fromstring(pygments.highlight(code,
+                pygments.lexers.get_lexer_by_name(lang),
+                pygments.formatters.HtmlFormatter()
             )))
         else:
             ET.SubElement(ET.SubElement(self.content, 'pre'), 'code').text = code
@@ -170,7 +171,7 @@ class to_html:
     def __call__(self, src, just_frontmatter=False):
         self.src = src.splitlines()
         self.current = 0
-        self.content = ET.Element('div', {'class': 'body'})
+        self.content = ET.Element('article', {'class': 'body'})
         self.header_ids = set()
 
         frontmatter = {}
