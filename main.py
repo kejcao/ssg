@@ -59,7 +59,7 @@ def render_template(tmpl, data):
 def renderj2(posts):
     for src in Path(ROOTDIR).glob('**/*.j2'):
         dest = src.with_suffix('.html')
-        if src not in IGNORE and should_update(src, dest):
+        if src not in IGNORE:
             dest.write_text(render_template(
                 str(src.relative_to(ROOTDIR)),
                 { 'posts': posts }
@@ -97,7 +97,7 @@ def render_posts():
                 { 'post': { 'content': content, **frontmatter } }
             ))
 
-    return posts
+    return sorted(posts, key=lambda p: p['date'], reverse=True)
 
 def main():
     global ARGS
